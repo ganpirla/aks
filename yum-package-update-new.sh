@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# run the "yum -q check-update" command and capture the output
+# Run the "yum -q check-update" command and capture the output
 output=$(yum -q check-update)
 
-# iterate over the output and extract the package name and version
-packages=()
+# Extract the package name, version and architecture from each line of the output
 while read -r line; do
-    if [[ $line =~ ([a-zA-Z0-9_\.-]+)\.[a-z0-9_-]+\s+([a-zA-Z0-9_\.-]+) ]]; then
-        name="${BASH_REMATCH[1]}"
-        version="${BASH_REMATCH[2]}"
-        packages+=("$name-$version")
-    fi
+    package=$(echo "$line" | awk '{print $1}')
+    version=$(echo "$line" | awk '{print $2}')
+    arch=$(echo "$line" | awk '{print $3}')
+    
+    # Replace the dot in the package name with a hyphen
+    formatted_package=$(echo "$package" | sed 's/\./-/g')
+    
+    # Print the package name, version and architecture in the desired format
+    printf "%s.%s\t%s.%s\n" "$formatted_package" "$arch" "$version" "$arch"
 done <<< "$output"
-
-# print the list of packages
-printf '%s\n' "${packages[@]}"
