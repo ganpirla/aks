@@ -1,22 +1,17 @@
 #!/bin/bash
 
-# run the "yum -q update --assumeno" command and capture the output
-output=$(yum -q update --assumeno)
+# run the "yum -q check-update" command and capture the output
+output=$(yum -q check-update)
 
-# split the output into lines and skip the header
-lines=$(echo "$output" | sed '1d')
-
-# iterate over the lines and extract the package name, version, release, and architecture
+# iterate over the output and extract the package name and version
 packages=()
-for line in $lines; do
-    if [[ $line == Updated* ]]; then
-        name=$(echo $line | awk '{print $2}' | awk -F "." '{print $1}')
-        version=$(echo $line | awk '{print $2}' | awk -F "." '{print $2}')
-        release=$(echo $line | awk '{print $2}' | awk -F "." '{print $3}')
-        arch=$(echo $line | awk '{print $2}' | awk -F "." '{print $4}')
-        packages+=("$name-$version-$release.$arch")
+while read -r line; do
+    if [[ $line =~ ([a-zA-Z0-9_\.-]+)\.[a-z0-9_-]+\s+([a-zA-Z0-9_\.-]+) ]]; then
+        name="${BASH_REMATCH[1]}"
+        version="${BASH_REMATCH[2]}"
+        packages+=("$name-$version")
     fi
-done
+done <<< "$output"
 
 # print the list of packages
 printf '%s\n' "${packages[@]}"
