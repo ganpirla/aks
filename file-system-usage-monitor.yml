@@ -1,23 +1,35 @@
-- name: Check file system usage
-  hosts: all
+---
+- name: Monitor file system usage and send email notification
+  hosts: your-remote-host
+  become: true
   vars:
-    threshold: 80  # Change this value to set the threshold percentage
-    email_sender: "ansible@example.com"  # Change this value to set the email sender
-    email_recipient: "user@example.com"  # Change this value to set the email recipient
+    email_sender: your_email_sender@your_domain.com
+    email_recipient: your_email_recipient@your_domain.com
+    ansible_server_hostname: "{{ ansible_hostname }}"
+    threshold_percent: 90
+
   tasks:
     - name: Get file system usage
-      shell: df -h
+      shell: df -h /
       register: df_output
 
-    - name: Filter file systems above threshold
+    - name: Check if usage is beyond threshold
       set_fact:
-        above_threshold: "{{ df_output.stdout_lines | select('match', '^(.+\\s+){4}\\d+%(\\s+.+)?$') | select('match', '\\d+%(\\s+.+)?$') | select('split', '%') | select('int') | select('gt', threshold) | list }}"
+        usage_beyond_threshold: "{{ (df_output.stdout_lines[1].split()[4] | int) > threshold_percent }}"
+      when: df_output.stdout_lines[1].split()[4] != "Use%"
 
-    - name: Create file with above threshold file systems
-      shell: echo "{{ above_threshold | join('\\n') }}" > /tmp/filesystems_above_threshold.txt
-
-    - name: Send email with file attachment
-      shell: "sendmail -t < /tmp/mail.txt"
+    - name: Send email notification
+      command: /usr/sbin/sendmail -t -oi -oem -f "{{ email_sender }}"
       args:
-        stdin: "{{ lookup('template', 'mail.j2') }}"
-      delegate_to: localhost
+        stdin: |
+          To: {{ email_recipient }}
+          From: {{ email_sender }}
+          Subject: File system usage report for {{ ansible_server_hostname }}
+
+          The file system usage on {{ ansible_server_hostname }} is:
+
+          {{ df_output.stdout }}
+
+          This email was sent from the Ansible server.
+
+      when: usage_beyond_threshold
