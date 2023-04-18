@@ -1,18 +1,19 @@
 ---
-- name: Check file system usage and send email notification
+- name: Monitor File Systems
   hosts: all
-  become: true
-
   vars:
-    threshold_percent: 90
-    recipient_email: "recipient@example.com"
-    sender_email: "sender@example.com"
-
+    threshold_limit: 80
   tasks:
-    - name: Check file system usage
-      shell: df -h | awk '{if(NR>1)print $5,$6}' | sed 's/%//'
-      register: usage_output
-
-    - name: Send email notification
-      command: "echo 'File system usage is high on {{ ansible_hostname }}' | sendmail -F '{{ sender_email }}' -f '{{ sender_email }}' '{{ recipient_email }}'"
-      when: usage_output.stdout_lines | map('split', ' ') | select('last') | map('int') | list | max > threshold_percent
+    - name: Check File Systems
+      shell: df -h
+      register: fs_info
+    - name: Parse File System Data
+      set_fact:
+        fs_data: "{{ fs_info.stdout_lines[1:] | map('regex_replace', '( )+', ',') | map('split', ',') | list }}"
+    - name: Check Threshold Limit
+      set_fact:
+        alert_fs: "{{ fs_data | selectattr('4', 'match', threshold_limit) | list }}"
+    - name: Send Alert Email
+      when: alert_fs | length > 0
+      command: echo "File system {{ item.5 }} on {{ inventory_hostname }} is above threshold limit of {{ threshold_limit }}%" | sendmail -s "File System Alert" youremail@example.com
+      loop: "{{ alert_fs }}"
