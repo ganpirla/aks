@@ -2,6 +2,7 @@
   hosts: all
   vars:
     threshold: 80  # Change this value to set the threshold percentage
+    email_sender: "ansible@example.com"  # Change this value to set the email sender
     email_recipient: "user@example.com"  # Change this value to set the email recipient
   tasks:
     - name: Get file system usage
