@@ -16,10 +16,15 @@
       shell: "df -hT"
       register: df_output
 
+    - name: Extract disk usage facts
+      set_fact:
+        df_lines: "{{ df_output.stdout_lines }}"
+      run_once: true
+
     - name: Check disk usage and send email
       when: "'Filesystem' not in item"
       # Exclude the header row of the `df -hT` output
-      loop: "{{ df_output.stdout_lines }}"
+      loop: "{{ df_lines }}"
       set_fact:
         # Extract filesystem, size, used, available, use%, mounted on information
         filesystem: "{{ item.split()[0] }}"
@@ -29,7 +34,6 @@
         use_percent: "{{ item.split()[4] }}"
         mount_point: "{{ item.split()[5] }}"
       # Check if usage is beyond threshold and send email
-      run_once: true
       command: "/usr/sbin/sendmail -t"
       args:
         stdin: "To: {{ email_receiver }}\nFrom: {{ email_sender }}\nSubject: Disk usage warning on {{ hostname }}\n\nFilesystem: {{ filesystem }}\nSize: {{ size }}\nUsed: {{ used }}\nAvailable: {{ available }}\nUse%: {{ use_percent }}\nMount Point: {{ mount_point }}"
