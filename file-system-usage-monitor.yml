@@ -1,35 +1,27 @@
 ---
-- name: Monitor file system usage and send email notification
-  hosts: your-remote-host
-  become: true
+- name: Monitor file system usage
+  hosts: all
+  
   vars:
-    email_sender: your_email_sender@your_domain.com
-    email_recipient: your_email_recipient@your_domain.com
-    ansible_server_hostname: "{{ ansible_hostname }}"
-    threshold_percent: 90
-
+    # set the threshold in percentage (example: 80%)
+    threshold: 80
+    # set the log file path on the Ansible server
+    log_file: "/var/log/file_system_usage.log"
+  
   tasks:
     - name: Get file system usage
-      shell: df -h /
+      shell: df -h | awk '{print $1 " " $5 " " $6}' | sed '1d'
       register: df_output
-
-    - name: Check if usage is beyond threshold
+  
+    - name: Check file system usage
       set_fact:
-        usage_beyond_threshold: "{{ (df_output.stdout_lines[1].split()[4] | int) > threshold_percent }}"
-      when: df_output.stdout_lines[1].split()[4] != "Use%"
-
-    - name: Send email notification
-      command: /usr/sbin/sendmail -t -oi -oem -f "{{ email_sender }}"
-      args:
-        stdin: |
-          To: {{ email_recipient }}
-          From: {{ email_sender }}
-          Subject: File system usage report for {{ ansible_server_hostname }}
-
-          The file system usage on {{ ansible_server_hostname }} is:
-
-          {{ df_output.stdout }}
-
-          This email was sent from the Ansible server.
-
-      when: usage_beyond_threshold
+        usage_exceeded: true
+      when: item.split()[1] | int > threshold
+      loop: "{{ df_output.stdout_lines }}"
+  
+    - name: Copy usage details to log file
+      lineinfile:
+        line: "{{ ansible_hostname }}: {{ item }}"
+        path: "{{ log_file }}"
+      when: usage_exceeded is defined
+      loop: "{{ df_output.stdout_lines }}"
