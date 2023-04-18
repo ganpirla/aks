@@ -3,6 +3,8 @@
   hosts: all
   vars:
     threshold_limit: 80
+    email_sender: "sender@example.com"
+    email_recipient: "recipient@example.com"
   tasks:
     - name: Check File Systems
       shell: df -h
@@ -15,5 +17,5 @@
         alert_fs: "{{ fs_data | selectattr('4', 'match', threshold_limit) | list }}"
     - name: Send Alert Email
       when: alert_fs | length > 0
-      command: echo "File system {{ item.5 }} on {{ inventory_hostname }} is above threshold limit of {{ threshold_limit }}%" | sendmail -s "File System Alert" youremail@example.com
+      command: echo "File system {{ item.5 }} on {{ inventory_hostname }} is above threshold limit of {{ threshold_limit }}%" | sendmail -s "File System Alert" -r "{{ email_sender }}" "{{ email_recipient }}"
       loop: "{{ alert_fs }}"
