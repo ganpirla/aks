@@ -7,9 +7,9 @@
   vars:
     threshold_percentage: 90
     email_recipient: user@example.com
-    email_subject: File system usage exceeded threshold
+    email_subject: File system usage exceeded threshold on {{ ansible_facts['hostname'] }}
     email_body: |
-      The following file systems are currently above {{ threshold_percentage }}% usage:
+      The following file systems are currently above {{ threshold_percentage }}% usage on {{ ansible_facts['hostname'] }}:
 
       {% for fs in fs_list %}
       {{ fs.mount }}: {{ fs.percent }}%
