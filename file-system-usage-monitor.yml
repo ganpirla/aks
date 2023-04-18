@@ -1,33 +1,40 @@
 ---
-- name: Check File System Usage and Send Notification
-  hosts: your_servers
-  gather_facts: yes
+- name: Check file system usage and send email notification
+  hosts: all
+  gather_facts: true
+  become: true
 
   vars:
-    threshold_limit: 80   # Change this value to set the threshold limit for file system usage
-    email_sender: "sender@example.com"
-    email_recipients: "recipient1@example.com, recipient2@example.com"
+    threshold_percentage: 90
+    email_recipient: user@example.com
+    email_subject: File system usage exceeded threshold
+    email_body: |
+      The following file systems are currently above {{ threshold_percentage }}% usage:
+
+      {% for fs in fs_list %}
+      {{ fs.mount }}: {{ fs.percent }}%
+      {% endfor %}
 
   tasks:
-    - name: Get File System Usage
+    - name: Get file system usage
       shell: df -h
       register: df_output
 
-    - name: Check if File System Usage is beyond Threshold Limit
+    - name: Parse file system usage
       set_fact:
-        usage_beyond_threshold: "{{ item.split()[4] | int > threshold_limit }}"
-      when: "'/dev/' in item"
-      loop: "{{ df_output.stdout_lines }}"
+        fs_list: "{{ df_output.stdout_lines[1:] | map('regex_replace', '^(\\S+\\s+){5}', '') | map('regex_replace', '\\s+', ',') | map('split', ',') | map('list') | map('zip_longest', ['filesystem', 'size', 'used', 'available', 'percent', 'mount']) | map('from_entries') | selectattr('percent|int', '>', threshold_percentage) | list }}"
 
-    - name: Send Notification if File System Usage is beyond Threshold Limit
-      when: usage_beyond_threshold
-      block:
-        - name: Create Mail Body
-          set_fact:
-            mail_body: |
-              Hostname: {{ ansible_hostname }}
-              File System Usage is beyond threshold limit of {{ threshold_limit }}%
-              {{ df_output.stdout }}
+    - name: Send email notification
+      shell: "echo '{{ email_body }}' | sendmail -t"
+      when: fs_list | length > 0
+      vars:
+        sendmail_path: "/usr/sbin/sendmail"
+        sendmail_command: "{{ sendmail_path }} -oi -t -f {{ ansible_facts['network']['hostname'] }}"
+        email_headers: "To: {{ email_recipient }}\nSubject: {{ email_subject }}\nFrom: {{ ansible_facts['network']['hostname'] }}"
 
-        - name: Send Mail Notification
-          shell: echo "{{ mail_body }}" | /usr/sbin/sendmail -t -f "{{ email_sender }}" -- "{{ email_recipients }}"
+      register: sendmail_output
+
+    - name: Debug sendmail output
+      debug:
+        var: sendmail_output.stdout_lines
+      when: sendmail_output.rc != 0
