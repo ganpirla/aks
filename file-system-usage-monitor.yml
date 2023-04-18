@@ -1,19 +1,12 @@
 ---
-- name: Check file system usage and send email notification
+- name: Monitor file system usage and send email notification
   hosts: all
-  gather_facts: true
   become: true
 
   vars:
-    threshold_percentage: 90
-    email_recipient: user@example.com
-    email_subject: File system usage exceeded threshold on {{ ansible_facts['hostname'] }}
-    email_body: |
-      The following file systems are currently above {{ threshold_percentage }}% usage on {{ ansible_facts['hostname'] }}:
-
-      {% for fs in fs_list %}
-      {{ fs.mount }}: {{ fs.percent }}%
-      {% endfor %}
+    threshold_percent: 90
+    recipient_email: "recipient@example.com"
+    sender_email: "sender@example.com"
 
   tasks:
     - name: Get file system usage
@@ -22,19 +15,14 @@
 
     - name: Parse file system usage
       set_fact:
-        fs_list: "{{ df_output.stdout_lines[1:] | map('regex_replace', '^(\\S+\\s+){5}', '') | map('regex_replace', '\\s+', ',') | map('split', ',') | map('list') | map('zip_longest', ['filesystem', 'size', 'used', 'available', 'percent', 'mount']) | map('from_entries') | selectattr('percent|int', '>', threshold_percentage) | list }}"
+        fs_usage: "{{ df_output.stdout_lines[1:] | map('regex_replace', '^\\S+\\s+\\S+\\s+\\S+\\s+\\S+\\s+(\\S+)%\\s+\\S+$', '\\1') | list }}"
+
+    - name: Check file system usage
+      debug:
+        msg: "File system {{ item.0 }} usage is {{ item.1 }}%"
+      loop: "{{ query('zip', df_output.stdout_lines[1:], fs_usage) }}"
+      when: item.1 | int > threshold_percent
 
     - name: Send email notification
-      shell: "echo '{{ email_body }}' | sendmail -t"
-      when: fs_list | length > 0
-      vars:
-        sendmail_path: "/usr/sbin/sendmail"
-        sendmail_command: "{{ sendmail_path }} -oi -t -f {{ ansible_facts['network']['hostname'] }}"
-        email_headers: "To: {{ email_recipient }}\nSubject: {{ email_subject }}\nFrom: {{ ansible_facts['network']['hostname'] }}"
-
-      register: sendmail_output
-
-    - name: Debug sendmail output
-      debug:
-        var: sendmail_output.stdout_lines
-      when: sendmail_output.rc != 0
+      shell: "echo 'File system usage is high' | sendmail -F '{{ sender_email }}' -f '{{ sender_email }}' '{{ recipient_email }}'"
+      when: df_output.stdout_lines is defined and df_output.stdout_lines | length > 1 and fs_usage | map('int') | any > threshold_percent
