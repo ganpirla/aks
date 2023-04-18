@@ -1,21 +1,41 @@
 ---
-- name: Monitor File Systems
+- name: Check file system usage and send mail if usage is beyond 80%
   hosts: all
+  become: yes
+
   vars:
-    threshold_limit: 80
-    email_sender: "sender@example.com"
-    email_recipient: "recipient@example.com"
+    mail_sender: your_email@example.com
+    mail_recipients:
+      - recipient1@example.com
+      - recipient2@example.com
+    hostname: "{{ ansible_hostname }}"
+
   tasks:
-    - name: Check File Systems
+    - name: Check file system usage using df command
       shell: df -h
-      register: fs_info
-    - name: Parse File System Data
+      register: df_output
+
+    - name: Filter file systems with usage greater than 80%
       set_fact:
-        fs_data: "{{ fs_info.stdout_lines[1:] | map('regex_replace', '^(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)%\\s+(.+)$', '{\\1: {filesystem: \\2, size: \\3, used: \\4, avail: \\5, use_percent: \\6, mount: \\7}}') | map('from_yaml') | list }}"
-    - name: Check Threshold Limit
-      set_fact:
-        alert_fs: "{{ fs_data | selectattr('value.use_percent', 'int', '>', threshold_limit) | list }}"
-    - name: Send Alert Email
-      when: alert_fs | length > 0
-      command: echo "File system {{ item.value.mount }} on {{ inventory_hostname }} is above threshold limit of {{ threshold_limit }}%" | sendmail -s "File System Alert" -r "{{ email_sender }}" "{{ email_recipient }}"
-      loop: "{{ alert_fs }}"
+        filesystems_to_alert: "{{ df_output.stdout_lines[1:] | select('match', '^[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +[^ ]+ +(8[1-9]|[9][0-9]|[1-9][0-9]{2})%.*$') | map('regex_replace', '^([^ ]+).+$', '\\1') | list }}"
+      when: df_output.stdout_lines | length > 1
+
+    - name: Send mail using sendmail if file system usage is beyond 80%
+      command: >
+        echo "File system {{ item }} usage is beyond 80% on {{ hostname }}. Please take necessary actions.
+        This message was sent by {{ mail_sender }}.
+        " | sendmail -t -f "{{ mail_sender }}"
+      loop: "{{ filesystems_to_alert }}"
+      notify: send_email
+
+  handlers:
+    - name: send_email
+      mail:
+        subject: "File system usage alert on {{ hostname }}"
+        to: "{{ mail_recipients }}"
+        from: "{{ mail_sender }}"
+        body: |
+          The following file systems on {{ hostname }} are above 80% usage:
+          {% for item in filesystems_to_alert %}
+            - {{ item }}
+          {% endfor %}
