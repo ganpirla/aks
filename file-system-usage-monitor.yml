@@ -1,30 +1,22 @@
----
-- name: Check file system usage and send mail notification
+- name: Check file system usage
   hosts: all
   vars:
-    threshold_limit: 80  # Set the threshold limit for file system usage
-    mail_recipient: user@example.com  # Set the email recipient
-    mail_sender: ansible@{{ ansible_fqdn }}  # Set the email sender
+    threshold: 80  # Change this value to set the threshold percentage
+    email_recipient: "user@example.com"  # Change this value to set the email recipient
   tasks:
-    - name: Check file system usage
+    - name: Get file system usage
       shell: df -h
       register: df_output
 
-    - name: Capture file systems beyond threshold limit
+    - name: Filter file systems above threshold
       set_fact:
-        high_fs: "{{ high_fs|default([]) + [item] }}"
-      loop: "{{ df_output.stdout_lines[1:] }}"
-      when: item.split()[-2] | int > threshold_limit
+        above_threshold: "{{ df_output.stdout_lines | select('match', '^(.+\\s+){4}\\d+%(\\s+.+)?$') | select('match', '\\d+%(\\s+.+)?$') | select('split', '%') | select('int') | select('gt', threshold) | list }}"
 
-    - name: Send mail notification for high file systems
-      command: "/usr/sbin/sendmail -t"
+    - name: Create file with above threshold file systems
+      shell: echo "{{ above_threshold | join('\\n') }}" > /tmp/filesystems_above_threshold.txt
+
+    - name: Send email with file attachment
+      shell: "sendmail -t < /tmp/mail.txt"
       args:
-        stdin_lines:
-          - "To: {{ mail_recipient }}"
-          - "From: {{ mail_sender }}"
-          - "Subject: High file system usage on {{ inventory_hostname }}"
-          - ""
-          - "The following file systems are beyond the threshold limit:"
-          - ""
-          - "{% for fs in high_fs %}{{ fs }}{% endfor %}"
-      when: high_fs is defined and high_fs | length > 0
+        stdin: "{{ lookup('template', 'mail.j2') }}"
+      delegate_to: localhost
