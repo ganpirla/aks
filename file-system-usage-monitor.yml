@@ -11,7 +11,7 @@
       register: fs_info
     - name: Parse File System Data
       set_fact:
-        fs_data: "{{ fs_info.stdout_lines[1:] | map('regex_replace', '^(\\\\S+)\\\\s+(\\\\S+)\\\\s+(\\\\S+)\\\\s+(\\\\S+)\\\\s+(\\\\S+)%\\\\s+(\\\\S+)$', '{\\1: {filesystem: \\2, size: \\3, used: \\4, avail: \\5, use_percent: \\6, mount: \\7}}') | map('from_yaml') | list }}"
+        fs_data: "{{ fs_info.stdout_lines[1:] | map('regex_replace', '^(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)%\\s+(.+)$', '{\\1: {filesystem: \\2, size: \\3, used: \\4, avail: \\5, use_percent: \\6, mount: \\7}}') | map('from_yaml') | list }}"
     - name: Check Threshold Limit
       set_fact:
         alert_fs: "{{ fs_data | selectattr('value.use_percent', 'int', '>', threshold_limit) | list }}"
