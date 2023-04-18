@@ -1,27 +1,30 @@
 ---
-- name: Monitor file system usage
-  hosts: all
-  
+- name: Check file system usage
+  hosts: target_server
+  become: true
+  gather_facts: true
+
   vars:
-    # set the threshold in percentage (example: 80%)
-    threshold: 80
-    # set the log file path on the Ansible server
-    log_file: "/var/log/file_system_usage.log"
-  
+    threshold_limit: 80  # set threshold limit to 80% usage
+
   tasks:
     - name: Get file system usage
-      shell: df -h | awk '{print $1 " " $5 " " $6}' | sed '1d'
-      register: df_output
-  
+      shell: "df -h"
+      register: fs_usage
+
     - name: Check file system usage
       set_fact:
-        usage_exceeded: true
-      when: item.split()[1] | int > threshold
-      loop: "{{ df_output.stdout_lines }}"
-  
-    - name: Copy usage details to log file
-      lineinfile:
-        line: "{{ ansible_hostname }}: {{ item }}"
-        path: "{{ log_file }}"
-      when: usage_exceeded is defined
-      loop: "{{ df_output.stdout_lines }}"
+        fs_exceeded_threshold: "{{ fs_usage.stdout_lines | skip(1) | map('regex_search', '^/dev/') | list | map('split') | list | selectattr('4', 'int') | select('>', threshold_limit) | list }}"
+
+    - name: Fetch file system usage
+      fetch:
+        src: "/var/log/fs_usage.log"
+        dest: "/tmp/{{ inventory_hostname }}_fs_usage.log"
+        flat: yes
+      when: fs_exceeded_threshold | length > 0
+
+    - name: Save file system usage to log
+      copy:
+        content: "{{ fs_usage.stdout }}"
+        dest: "/var/log/fs_usage.log"
+      when: fs_exceeded_threshold | length > 0
