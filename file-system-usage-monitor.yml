@@ -11,11 +11,11 @@
       register: fs_info
     - name: Parse File System Data
       set_fact:
-        fs_data: "{{ fs_info.stdout_lines[1:] | map('regex_replace', '( )+', ',') | map('split', ',') | list }}"
+        fs_data: "{{ fs_info.stdout_lines[1:] | map('regex_replace', '^(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)%\\s+(\\S+)$', '{\\1: {filesystem: \\2, size: \\3, used: \\4, avail: \\5, use_percent: \\6, mount: \\7}}') | map('from_yaml') | list }}"
     - name: Check Threshold Limit
       set_fact:
-        alert_fs: "{{ fs_data | selectattr('4', 'match', threshold_limit) | list }}"
+        alert_fs: "{{ fs_data | selectattr('value.use_percent', 'int', '>', threshold_limit) | list }}"
     - name: Send Alert Email
       when: alert_fs | length > 0
-      command: echo "File system {{ item.5 }} on {{ inventory_hostname }} is above threshold limit of {{ threshold_limit }}%" | sendmail -s "File System Alert" -r "{{ email_sender }}" "{{ email_recipient }}"
+      command: echo "File system {{ item.value.mount }} on {{ inventory_hostname }} is above threshold limit of {{ threshold_limit }}%" | sendmail -s "File System Alert" -r "{{ email_sender }}" "{{ email_recipient }}"
       loop: "{{ alert_fs }}"
