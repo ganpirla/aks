@@ -4,6 +4,7 @@
   gather_facts: true
   vars:
     threshold_pct: 80
+    email_from: "monitoring@example.com"
     email_recipients:
       - "admin@example.com"
 
@@ -26,6 +27,7 @@
       args:
         stdin: |
           Subject: File system usage is high on {{ inventory_hostname }}
+          From: {{ email_from }}
           
           The following file systems are above the threshold of {{ threshold_pct }}% usage on {{ inventory_hostname }}:
           {% for fs in high_fs %}
