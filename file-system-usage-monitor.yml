@@ -1,5 +1,5 @@
 ---
-- name: Monitor file system usage and send email notification
+- name: Check file system usage and send email notification
   hosts: all
   become: true
 
@@ -9,20 +9,10 @@
     sender_email: "sender@example.com"
 
   tasks:
-    - name: Get file system usage
-      shell: df -h
-      register: df_output
-
-    - name: Parse file system usage
-      set_fact:
-        fs_usage: "{{ df_output.stdout_lines[1:] | map('regex_replace', '^\\S+\\s+\\S+\\s+\\S+\\s+\\S+\\s+(\\S+)%\\s+\\S+$', '\\1') | list }}"
-
     - name: Check file system usage
-      debug:
-        msg: "File system {{ item.0 }} usage is {{ item.1 }}%"
-      loop: "{{ query('zip', df_output.stdout_lines[1:], fs_usage) }}"
-      when: item.1 | int > threshold_percent
+      shell: df -h | awk '{if(NR>1)print $5,$6}' | sed 's/%//'
+      register: usage_output
 
     - name: Send email notification
-      shell: "echo 'File system usage is high' | sendmail -F '{{ sender_email }}' -f '{{ sender_email }}' '{{ recipient_email }}'"
-      when: df_output.stdout_lines is defined and df_output.stdout_lines | length > 1 and fs_usage | map('int') | any > threshold_percent
+      command: "echo 'File system usage is high on {{ ansible_hostname }}' | sendmail -F '{{ sender_email }}' -f '{{ sender_email }}' '{{ recipient_email }}'"
+      when: usage_output.stdout_lines | map('split', ' ') | select('last') | map('int') | list | max > threshold_percent
