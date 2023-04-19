@@ -7,3 +7,24 @@
             register: disk_usage  
           - debug:
                   var: disk_usage.stdout_lines
+                  
+                  
+                  
+=====
+
+
+- name: Check File system Space Usage
+  hosts: all
+  tasks:
+    - name: Display file systems with more than 10% usage
+      shell: df -P | awk '0+$5 >= 30 {print}'
+      register: disk_usage  
+
+    - name: Send email notification if disk usage is high
+      shell: echo "High disk usage on {{ inventory_hostname }}. Details:\n\n{{ disk_usage.stdout }}" | sendmail recipient@example.com
+      when: disk_usage.stdout_lines | length > 0
+
+    - debug:
+        var: disk_usage.stdout_lines
+
+                  
