@@ -1,12 +1,8 @@
-- name: Check Disk Space Usage
-  hosts: srv1.example.com
+- hosts: all
   tasks:
-    - name: Disk usage from command module
-      command: df -h
-      register: space
+    - name: Display file systems with more than 80% usage
+      shell: 'df -h | awk ''NR>1 && $5 > 80 {print}'' | sed ''s/^ *//g'''
+      register: disk_usage
 
-    - name: Display only file systems beyond threshold limit
-      debug:
-        msg: "{{ item }}"
-      when: item.5|int >= 80   # Modify threshold limit as needed
-      with_items: "{{ space.stdout_lines[1:] }}"
+    - debug:
+        var: disk_usage.stdout_lines
