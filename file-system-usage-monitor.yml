@@ -28,3 +28,41 @@
         var: disk_usage.stdout_lines
 
                   
+=========
+
+
+
+- hosts: all
+  tasks:
+    - name: Example task
+      debug:
+        var: some_variable
+      register: debug_output
+
+    - name: Check filesystem usage
+      shell: df -h | awk '{if($5>80) print $0}'
+      register: disk_usage
+
+    - name: Create debug output file on control node
+      file:
+        path: /path/to/debug_output.txt
+        state: touch
+      delegate_to: localhost
+
+    - name: Write debug output to file on control node
+      copy:
+        content: |
+          {{ inventory_hostname }} filesystem usage:
+          {{ debug_output.stdout }}
+
+        dest: /path/to/debug_output.txt
+        remote_src: yes
+      when: disk_usage.stdout_lines | length > 0
+
+    - name: Copy debug output file to control node
+      fetch:
+        src: /path/to/debug_output.txt
+        dest: /path/to/
+        flat: yes
+      delegate_to: localhost
+      when: disk_usage.stdout_lines | length > 0
