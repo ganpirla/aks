@@ -27,3 +27,24 @@
 
       with_items: "{{ groups['all'] }}"
       run_once: true
+
+=====================
+
+
+- name: Display file systems with more than 80% usage
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Check disk usage
+      shell: "df -h | awk 'NR>1 && $5 > 80 {print}' | sed 's/^ *//g'"
+      register: disk_usage
+      when: inventory_hostname == "{{ item }}"
+      with_items: "{{ groups['all'] }}"
+      run_once: true
+
+    - name: Print disk usage
+      debug:
+        msg: "File system usage on {{ inventory_hostname }}: {{ disk_usage.stdout_lines }}"
+      when: inventory_hostname == "{{ item }}"
+      with_items: "{{ groups['all'] }}"
+      run_once: true
