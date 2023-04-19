@@ -1,30 +1,12 @@
----
-- name: Check file system usage
-  hosts: target_server
-  become: true
-  gather_facts: true
-
-  vars:
-    threshold_limit: 80  # set threshold limit to 80% usage
-
+- name: Check Disk Space Usage
+  hosts: srv1.example.com
   tasks:
-    - name: Get file system usage
-      shell: "df -h"
-      register: fs_usage
+    - name: Disk usage from command module
+      command: df -h
+      register: space
 
-    - name: Check file system usage
-      set_fact:
-        fs_exceeded_threshold: "{{ fs_usage.stdout_lines | skip(1) | map('regex_search', '^/dev/') | list | map('split') | list | selectattr('4', 'int') | select('>', threshold_limit) | list }}"
-
-    - name: Fetch file system usage
-      fetch:
-        src: "/var/log/fs_usage.log"
-        dest: "/tmp/{{ inventory_hostname }}_fs_usage.log"
-        flat: yes
-      when: fs_exceeded_threshold | length > 0
-
-    - name: Save file system usage to log
-      copy:
-        content: "{{ fs_usage.stdout }}"
-        dest: "/var/log/fs_usage.log"
-      when: fs_exceeded_threshold | length > 0
+    - name: Display only file systems beyond threshold limit
+      debug:
+        msg: "{{ item }}"
+      when: item.5|int >= 80   # Modify threshold limit as needed
+      with_items: "{{ space.stdout_lines[1:] }}"
