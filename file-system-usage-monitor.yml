@@ -1,68 +1,18 @@
 ---
-- name: Check File system Space Usage
+- name: Check File system Space Usage more than 30%
   hosts: all
   tasks:
-          - name: Display file systems with more than 10% usage
+          - name: Display file systems with more than 30% usage
             shell: df -P | awk '0+$5 >= 30 {print}'
             register: disk_usage  
           - debug:
-                  var: disk_usage.stdout_lines
-                  
-                  
-                  
-=====
+                  var: disk_usage.stdout_lines   
 
-
-- name: Check File system Space Usage
-  hosts: all
-  tasks:
-    - name: Display file systems with more than 10% usage
-      shell: df -P | awk '0+$5 >= 30 {print}'
-      register: disk_usage  
-
-    - name: Send email notification if disk usage is high
-      shell: echo "High disk usage on {{ inventory_hostname }}. Details:\n\n{{ disk_usage.stdout }}" | sendmail recipient@example.com
-      when: disk_usage.stdout_lines | length > 0
-
-    - debug:
-        var: disk_usage.stdout_lines
-
-                  
-=========
-
-
-
-- hosts: all
-  tasks:
-    - name: Example task
-      debug:
-        var: some_variable
-      register: debug_output
-
-    - name: Check filesystem usage
-      shell: df -h | awk '{if($5>80) print $0}'
-      register: disk_usage
-
-    - name: Create debug output file on control node
-      file:
-        path: /path/to/debug_output.txt
-        state: touch
-      delegate_to: localhost
-
-    - name: Write debug output to file on control node
-      copy:
-        content: |
-          {{ inventory_hostname }} filesystem usage:
-          {{ debug_output.stdout }}
-
-        dest: /path/to/debug_output.txt
-        remote_src: yes
-      when: disk_usage.stdout_lines | length > 0
-
-    - name: Copy debug output file to control node
-      fetch:
-        src: /path/to/debug_output.txt
-        dest: /path/to/
-        flat: yes
-      delegate_to: localhost
-      when: disk_usage.stdout_lines | length > 0
+          - name: Write debug output to file on control node
+            copy:
+              content: |
+                {{ inventory_hostname }} filesystem usage more than 30%:
+                {{ disk_usage.stdout }}   
+              dest: /tmp/file-system-usage.txt
+            delegate_to: localhost
+            when: disk_usage.stdout_lines | length > 0   
