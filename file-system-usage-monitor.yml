@@ -1,50 +1,9 @@
-- hosts: all
-  tasks:
-    - name: Display file systems with more than 80% usage
-      shell: 'df -h | awk ''NR>1 && $5 > 80 {print}'' | sed ''s/^ *//g'''
-      register: disk_usage
-
-    - debug:
-        var: disk_usage.stdout_lines
-
-
-
-========================================================
-
-- hosts: all
-  tasks:
-    - name: Display file systems with more than 80% usage
-      shell: 'df -h | awk ''NR>1 && $5 > 80 {print}}'' | sed ''s/^ *//g'''
-      register: disk_usage
-      when: inventory_hostname == "{{ item }}"
-
-      with_items: "{{ groups['all'] }}"
-      run_once: true
-
-    - debug:
-        msg: "File system usage on {{ inventory_hostname }}: {{ disk_usage.stdout_lines }}"
-      when: inventory_hostname == "{{ item }}"
-
-      with_items: "{{ groups['all'] }}"
-      run_once: true
-
-=====================
-
-
-- name: Display file systems with more than 80% usage
+---
+- name: Check File system Space Usage
   hosts: all
-  gather_facts: true
   tasks:
-    - name: Check disk usage
-      shell: "df -h | awk 'NR>1 && $5 > 80 {print}' | sed 's/^ *//g'"
-      register: disk_usage
-      when: inventory_hostname == "{{ item }}"
-      with_items: "{{ groups['all'] }}"
-      run_once: true
-
-    - name: Print disk usage
-      debug:
-        msg: "File system usage on {{ inventory_hostname }}: {{ disk_usage.stdout_lines }}"
-      when: inventory_hostname == "{{ item }}"
-      with_items: "{{ groups['all'] }}"
-      run_once: true
+          - name: Display file systems with more than 10% usage
+            shell: df -P | awk '0+$5 >= 30 {print}'
+            register: disk_usage  
+          - debug:
+                  var: disk_usage.stdout_lines
