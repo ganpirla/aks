@@ -1,0 +1,20 @@
+---
+- name: Find process details based on CPU usage
+  hosts: <host_name>
+  gather_facts: yes
+
+  vars:
+    cpu_threshold: 50
+
+  tasks:
+    - name: Get process details
+      shell: "ps -eo pid,%cpu,%mem,cmd --sort=-%cpu | head -n 6"
+      register: process_output
+
+    - name: Filter processes by CPU usage
+      set_fact:
+        high_cpu_processes: "{{ process_output.stdout_lines[1:] | select('match', '^[ ]*[0-9]+[ ]+([0-9]+\.[0-9]+)[ ]+[0-9]+\.[0-9]+[ ]+.+$') | selectattr('1', 'float', '>=', cpu_threshold) | map('regex_replace', '^ +| +$', '') | list }}"
+
+    - name: Print high CPU processes
+      debug:
+        var: high_cpu_processes
